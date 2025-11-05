@@ -1,35 +1,116 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 
 const API_URL = "http://localhost:5000/api";
 
-export default function App({ onGenreClick }) {
+export default function App() {
   const [movies, setMovies] = useState([]);
+  const [genres, setGenres] = useState([]);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const selectedGenre = searchParams.get("genre");
 
   useEffect(() => {
     fetch(`${API_URL}/movies`)
       .then((r) => r.json())
-      .then(setMovies)
+      .then((moviesData) => {
+        setMovies(moviesData);
+        // Extract unique genres
+        const allGenres = new Set();
+        moviesData.forEach((movie) => {
+          if (movie.genres) {
+            if (Array.isArray(movie.genres)) {
+              movie.genres.forEach((g) => allGenres.add(g.trim()));
+            } else {
+              allGenres.add(movie.genres.trim());
+            }
+          }
+        });
+        setGenres(Array.from(allGenres).sort());
+      })
       .catch(console.error);
   }, []);
+
+  // Filter movies by genre if a genre is selected
+  const filteredMovies = selectedGenre
+    ? movies.filter((movie) => {
+        if (!movie.genres) return false;
+        if (Array.isArray(movie.genres)) {
+          return movie.genres.some((g) => g.trim().toLowerCase() === selectedGenre.toLowerCase());
+        }
+        return movie.genres.trim().toLowerCase() === selectedGenre.toLowerCase();
+      })
+    : movies;
 
   const handleGenreClick = (e, genre) => {
     e.preventDefault();
     e.stopPropagation();
-    if (onGenreClick) {
-      onGenreClick();
-    }
+    // Navigate to filtered view by genre
+    navigate(`/?genre=${encodeURIComponent(genre.trim())}`);
   };
 
   return (
     <>
-    <div className="p-6 min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-6xl font-extrabold text-white mb-12 tracking-tight text-center">
-          Movies <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Collection</span>
-        </h1>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {movies.map((m) => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="flex">
+        {/* Genres Sidebar - Fixed at left edge */}
+        <div className="w-64 flex-shrink-0 p-6">
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 sticky top-6">
+            <h2 className="text-xl font-bold text-white mb-4">Genres</h2>
+            <div className="space-y-1">
+              <Link
+                to="/"
+                className={`block px-3 py-2 text-sm rounded-md transition-colors ${
+                  !selectedGenre
+                    ? "text-purple-300 bg-purple-600/20 border-l-2 border-purple-500"
+                    : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                }`}
+              >
+                All Movies
+              </Link>
+              {genres.map((genre, idx) => (
+                <Link
+                  key={idx}
+                  to={`/?genre=${encodeURIComponent(genre)}`}
+                  className={`block px-3 py-2 text-sm rounded-md transition-colors ${
+                    selectedGenre === genre
+                      ? "text-purple-300 bg-purple-600/20 border-l-2 border-purple-500"
+                      : "text-slate-300 hover:text-white hover:bg-slate-700/50"
+                  }`}
+                >
+                  {genre}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Main Content Area */}
+        <div className="flex-1 p-6">
+          <div className="max-w-7xl mx-auto">
+            <h1 className="text-6xl font-extrabold text-white mb-12 tracking-tight text-center">
+              Movies <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">Collection</span>
+            </h1>
+            {selectedGenre && (
+              <div className="mb-6 text-center">
+                <span className="inline-block px-4 py-2 bg-purple-600 text-white text-lg font-semibold rounded-lg border border-purple-700">
+                  Genre: {selectedGenre}
+                </span>
+                <Link 
+                  to="/"
+                  className="ml-4 inline-block px-4 py-2 bg-slate-700 text-white text-lg font-semibold rounded-lg border border-slate-600 hover:bg-slate-600 transition-colors"
+                >
+                  Clear Filter
+                </Link>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          {filteredMovies.length === 0 ? (
+            <div className="col-span-full text-center py-12">
+              <p className="text-slate-400 text-xl">No movies found for genre: <span className="text-purple-400 font-semibold">{selectedGenre}</span></p>
+            </div>
+          ) : (
+            filteredMovies.map((m) => (
             <Link to={m.movie_link} target="_blank" rel="noopener noreferrer" key={m.id}>
             <div className="group cursor-pointer">
               <div className="relative  bg-slate-800 rounded-2xl shadow-2xl hover:shadow-purple-500/20 transition-all duration-500 transform hover:-translate-y-3 overflow-hidden border border-slate-700/50">
@@ -90,7 +171,10 @@ export default function App({ onGenreClick }) {
               </div>
             </div>
             </Link>
-          ))}
+            ))
+          )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
